@@ -12,11 +12,12 @@ const createVisitorLog = asyncHandler(async (req, res) => {
   let visitorStatus = status || 'scheduled';
   let needsApprovalFrom = null;
   
-  if (req.user.role === 'security' && !status) {
+  // When security creates a visitor, it always requires approval (unless explicitly scheduled)
+  if (req.user.role === 'security' && (!status || status === 'pending_approval')) {
     visitorStatus = 'pending_approval';
     
     // If approver is specified in request, use it; otherwise determine automatically
-    if (requestedApprover) {
+    if (requestedApprover && (typeof requestedApprover === 'string' ? requestedApprover.trim() !== '' : true)) {
       // Validate that the requested approver exists and is for the correct flat
       const approver = await User.findById(requestedApprover);
       if (approver && approver.flatNumber === visitorData.flatToVisit && 
@@ -38,6 +39,11 @@ const createVisitorLog = asyncHandler(async (req, res) => {
       const owner = flatUsers.find(u => u.role === 'owner');
       
       needsApprovalFrom = tenant ? tenant._id : (owner ? owner._id : null);
+      
+      // If no approver found, throw error
+      if (!needsApprovalFrom) {
+        throw new ApiError(400, 'No active resident found for this flat to approve the visitor');
+      }
     }
   }
   

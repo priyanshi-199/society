@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Badge, Button, Card, Form, Modal, Image } from 'react-bootstrap';
-import { Heart, HeartFill, Chat, Trash } from 'react-bootstrap-icons';
+import { Heart, HeartFill, Chat, Trash, Download, X, ChevronLeft, ChevronRight } from 'react-bootstrap-icons';
 import apiClient from '../services/ApiClient';
 import { globalEventBus } from '../utils/EventBus';
 import { useAuth } from '../context/AuthContext';
@@ -13,6 +13,7 @@ export default function Community() {
   const [showCommentModal, setShowCommentModal] = useState(null);
   const [form, setForm] = useState({ content: '', images: [] });
   const [commentText, setCommentText] = useState('');
+  const [imageViewer, setImageViewer] = useState({ show: false, images: [], currentIndex: 0 });
 
   const fetchPosts = async () => {
     try {
@@ -30,24 +31,52 @@ export default function Community() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     try {
+      // Validate that images are properly formatted
+      const imagesToSend = form.images.filter(img => img && img.url && img.url.trim() !== '');
+      
       await apiClient.request('/community', {
         method: 'POST',
-        body: form,
+        body: {
+          content: form.content,
+          images: imagesToSend,
+        },
       });
       globalEventBus.emit('notify', { type: 'success', message: 'Post created' });
       setShowModal(false);
       setForm({ content: '', images: [] });
       fetchPosts();
     } catch (error) {
-      globalEventBus.emit('notify', { type: 'danger', message: error.message });
+      globalEventBus.emit('notify', { 
+        type: 'danger', 
+        message: error.message || 'Failed to create post. Image may be too large.' 
+      });
     }
   };
 
   const handleImageChange = async (event) => {
     const files = Array.from(event.target.files);
     const imageData = [];
+    const maxSize = 5 * 1024 * 1024; // 5MB per image
     
     for (const file of files) {
+      // Validate file size
+      if (file.size > maxSize) {
+        globalEventBus.emit('notify', { 
+          type: 'warning', 
+          message: `${file.name} is too large. Maximum size is 5MB.` 
+        });
+        continue;
+      }
+      
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        globalEventBus.emit('notify', { 
+          type: 'warning', 
+          message: `${file.name} is not a valid image file.` 
+        });
+        continue;
+      }
+      
       // Convert to base64 for storage
       const reader = new FileReader();
       const promise = new Promise((resolve) => {
@@ -57,14 +86,22 @@ export default function Community() {
             url: e.target.result, // Base64 data URL
           });
         };
-        reader.onerror = () => resolve(null);
+        reader.onerror = () => {
+          globalEventBus.emit('notify', { 
+            type: 'danger', 
+            message: `Failed to read ${file.name}` 
+          });
+          resolve(null);
+        };
       });
       reader.readAsDataURL(file);
       const result = await promise;
       if (result) imageData.push(result);
     }
     
-    setForm(prev => ({ ...prev, images: [...prev.images, ...imageData] }));
+    if (imageData.length > 0) {
+      setForm(prev => ({ ...prev, images: [...prev.images, ...imageData] }));
+    }
   };
 
   const handleLike = async (postId) => {
@@ -117,6 +154,90 @@ export default function Community() {
     return post.likes?.some(like => like._id === user?.id || like === user?.id);
   };
 
+  const openImageViewer = (images, index = 0) => {
+    setImageViewer({ show: true, images, currentIndex: index });
+  };
+
+  const closeImageViewer = () => {
+    setImageViewer({ show: false, images: [], currentIndex: 0 });
+  };
+
+  const navigateImage = (direction) => {
+    const { images, currentIndex } = imageViewer;
+    let newIndex = currentIndex;
+    
+    if (direction === 'prev') {
+      newIndex = currentIndex > 0 ? currentIndex - 1 : images.length - 1;
+    } else {
+      newIndex = currentIndex < images.length - 1 ? currentIndex + 1 : 0;
+    }
+    
+    setImageViewer(prev => ({ ...prev, currentIndex: newIndex }));
+  };
+
+  const downloadImage = (image) => {
+    try {
+      const imageUrl = image.url || image;
+      const fileName = image.fileName || `image-${Date.now()}.jpg`;
+      
+      // Handle base64 data URLs
+      if (imageUrl.startsWith('data:')) {
+        // Convert base64 to blob
+        const response = fetch(imageUrl);
+        response.then(res => res.blob()).then(blob => {
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+          globalEventBus.emit('notify', { type: 'success', message: 'Image downloaded' });
+        }).catch(() => {
+          // Fallback: try direct download
+          const link = document.createElement('a');
+          link.href = imageUrl;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          globalEventBus.emit('notify', { type: 'success', message: 'Image downloaded' });
+        });
+      } else {
+        // Regular URL
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        globalEventBus.emit('notify', { type: 'success', message: 'Image downloaded' });
+      }
+    } catch (error) {
+      globalEventBus.emit('notify', { type: 'danger', message: 'Failed to download image' });
+    }
+  };
+
+  // Handle keyboard navigation
+  useEffect(() => {
+    if (!imageViewer.show) return;
+    
+    const handleKeyPress = (e) => {
+      if (e.key === 'Escape') {
+        closeImageViewer();
+      } else if (e.key === 'ArrowLeft') {
+        navigateImage('prev');
+      } else if (e.key === 'ArrowRight') {
+        navigateImage('next');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageViewer.show]);
+
   return (
     <div className="d-flex flex-column gap-4">
       <div className="d-flex justify-content-between align-items-center">
@@ -152,7 +273,47 @@ export default function Community() {
               {post.images && post.images.length > 0 && (
                 <div className="d-flex flex-wrap gap-2 mb-3">
                   {post.images.map((img, idx) => (
-                    <Image key={idx} src={img.url} alt={img.fileName} thumbnail style={{ maxWidth: '200px', maxHeight: '200px' }} />
+                    <div
+                      key={idx}
+                      style={{
+                        position: 'relative',
+                        cursor: 'pointer',
+                        maxWidth: '200px',
+                        maxHeight: '200px',
+                      }}
+                      onClick={() => openImageViewer(post.images, idx)}
+                    >
+                      <Image 
+                        src={img.url || img} 
+                        alt={img.fileName || `Image ${idx + 1}`} 
+                        thumbnail 
+                        style={{ 
+                          maxWidth: '200px', 
+                          maxHeight: '200px', 
+                          objectFit: 'cover',
+                          width: '100%',
+                          height: '100%',
+                        }}
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '5px',
+                          right: '5px',
+                          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                          borderRadius: '4px',
+                          padding: '2px 6px',
+                          color: 'white',
+                          fontSize: '12px',
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        Click to enlarge
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -229,7 +390,32 @@ export default function Community() {
               {form.images.length > 0 && (
                 <div className="d-flex flex-wrap gap-2 mt-2">
                   {form.images.map((img, idx) => (
-                    <Image key={idx} src={img.url} thumbnail style={{ maxWidth: '100px', maxHeight: '100px' }} />
+                    <div key={idx} style={{ position: 'relative', display: 'inline-block' }}>
+                      <Image 
+                        src={img.url} 
+                        thumbnail 
+                        style={{ maxWidth: '100px', maxHeight: '100px', objectFit: 'cover' }} 
+                      />
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        style={{
+                          position: 'absolute',
+                          top: '2px',
+                          right: '2px',
+                          padding: '2px 6px',
+                          fontSize: '12px',
+                        }}
+                        onClick={() => {
+                          setForm(prev => ({
+                            ...prev,
+                            images: prev.images.filter((_, i) => i !== idx)
+                          }));
+                        }}
+                      >
+                        ×
+                      </Button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -265,6 +451,137 @@ export default function Community() {
           </Button>
           <Button onClick={() => handleAddComment(showCommentModal)}>Comment</Button>
         </Modal.Footer>
+      </Modal>
+
+      {/* Image Viewer Modal */}
+      <Modal 
+        show={imageViewer.show} 
+        onHide={closeImageViewer}
+        size="xl"
+        centered
+        style={{ zIndex: 1050 }}
+      >
+        <Modal.Body style={{ padding: 0, position: 'relative', backgroundColor: '#000' }}>
+          <Button
+            variant="link"
+            style={{
+              position: 'absolute',
+              top: '10px',
+              right: '10px',
+              zIndex: 1051,
+              color: 'white',
+              padding: '8px',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              borderRadius: '50%',
+            }}
+            onClick={closeImageViewer}
+          >
+            <X size={24} />
+          </Button>
+
+          {imageViewer.images.length > 1 && (
+            <>
+              <Button
+                variant="link"
+                style={{
+                  position: 'absolute',
+                  left: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 1051,
+                  color: 'white',
+                  padding: '12px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  borderRadius: '50%',
+                }}
+                onClick={() => navigateImage('prev')}
+              >
+                <ChevronLeft size={24} />
+              </Button>
+              <Button
+                variant="link"
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  zIndex: 1051,
+                  color: 'white',
+                  padding: '12px',
+                  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                  borderRadius: '50%',
+                }}
+                onClick={() => navigateImage('next')}
+              >
+                <ChevronRight size={24} />
+              </Button>
+            </>
+          )}
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              minHeight: '70vh',
+              padding: '20px',
+            }}
+          >
+            {imageViewer.images[imageViewer.currentIndex] && (
+              <Image
+                src={imageViewer.images[imageViewer.currentIndex].url || imageViewer.images[imageViewer.currentIndex]}
+                alt={imageViewer.images[imageViewer.currentIndex].fileName || `Image ${imageViewer.currentIndex + 1}`}
+                fluid
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '70vh',
+                  objectFit: 'contain',
+                }}
+              />
+            )}
+          </div>
+
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '20px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 1051,
+              display: 'flex',
+              gap: '10px',
+              alignItems: 'center',
+            }}
+          >
+            {imageViewer.images.length > 1 && (
+              <div
+                style={{
+                  backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                  color: 'white',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  fontSize: '14px',
+                }}
+              >
+                {imageViewer.currentIndex + 1} / {imageViewer.images.length}
+              </div>
+            )}
+            <Button
+              variant="primary"
+              onClick={() => downloadImage(imageViewer.images[imageViewer.currentIndex])}
+              style={{
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <Download size={18} />
+              Download
+            </Button>
+          </div>
+        </Modal.Body>
       </Modal>
     </div>
   );

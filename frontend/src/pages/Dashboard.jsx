@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, Col, Row, Spinner } from 'react-bootstrap';
+import { CashStack, ClipboardCheck, People, Megaphone, ExclamationTriangle } from 'react-bootstrap-icons';
 import apiClient from '../services/ApiClient';
 import { globalEventBus } from '../utils/EventBus';
 import { useAuth } from '../context/AuthContext';
@@ -34,71 +35,194 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
-        <Spinner animation="border" />
+        <Spinner animation="border" style={{ color: 'var(--primary-color)' }} />
       </div>
     );
   }
 
+  const StatCard = ({ title, value, subtitle, icon: Icon, gradient, delay = 0 }) => (
+    <Col md={4} className="mb-4 fade-in" style={{ animationDelay: `${delay}ms` }}>
+      <Card
+        className="modern-card h-100"
+        style={{
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
+          borderRadius: '16px',
+          overflow: 'hidden',
+          transition: 'all 0.3s ease',
+        }}
+      >
+        <div
+          style={{
+            background: gradient || 'var(--gradient-primary)',
+            padding: '24px',
+            color: 'white',
+          }}
+        >
+          <div className="d-flex justify-content-between align-items-start">
+            <div>
+              <h6 style={{ margin: 0, opacity: 0.9, fontSize: '0.9rem', fontWeight: 500 }}>
+                {title}
+              </h6>
+              <h2
+                className="mt-2 mb-0"
+                style={{
+                  fontSize: '2.5rem',
+                  fontWeight: 700,
+                }}
+              >
+                {value}
+              </h2>
+            </div>
+            <div
+              style={{
+                width: '56px',
+                height: '56px',
+                borderRadius: '12px',
+                background: 'rgba(255, 255, 255, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backdropFilter: 'blur(10px)',
+              }}
+            >
+              <Icon size={28} />
+            </div>
+          </div>
+        </div>
+        {subtitle && (
+          <Card.Body style={{ padding: '16px 24px' }}>
+            <small style={{ color: 'var(--text-secondary)' }}>{subtitle}</small>
+          </Card.Body>
+        )}
+      </Card>
+    </Col>
+  );
+
   return (
     <div className="d-flex flex-column gap-4">
-      {!hasRole('tenant') && (
+      <div className="mb-4">
+        <h2
+          className="fw-bold mb-2"
+          style={{
+            color: 'var(--text-primary)',
+            fontSize: '2rem',
+          }}
+        >
+          Dashboard
+        </h2>
+        <p style={{ color: 'var(--text-secondary)', margin: 0 }}>
+          Welcome back! Here's what's happening in your society.
+        </p>
+      </div>
+
+      {!hasRole('tenant') && data?.bills && (
         <Row>
-          <Col md={4}>
-            <Card className="shadow-sm">
-              <Card.Body>
-                <Card.Title>Maintenance Due</Card.Title>
-                {data.bills && data.bills.length > 0 && data.bills[0] ? (
-                  <>
-                    <Card.Text className="display-5 fw-bold text-primary">
-                      ₹ {data.bills[0].amount.toLocaleString()}
-                    </Card.Text>
-                    <small className="text-muted">
-                      Due: {new Date(data.bills[0].dueDate).toLocaleDateString()}
-                    </small>
-                  </>
-                ) : (
-                  <>
-                    <Card.Text className="display-5 fw-bold text-success">₹ 0</Card.Text>
-                    <small className="text-muted">No pending bills</small>
-                  </>
-                )}
-              </Card.Body>
-            </Card>
-          </Col>
+          <StatCard
+            title="Maintenance Due"
+            value={
+              data.bills.length > 0 && data.bills[0]
+                ? `₹${data.bills[0].amount.toLocaleString()}`
+                : '₹0'
+            }
+            subtitle={
+              data.bills.length > 0 && data.bills[0]
+                ? `Due: ${new Date(data.bills[0].dueDate).toLocaleDateString()}`
+                : 'No pending bills'
+            }
+            icon={CashStack}
+            gradient={
+              data.bills.length > 0 && data.bills[0]
+                ? 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)'
+                : 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
+            }
+            delay={0}
+          />
         </Row>
       )}
+
       <Row>
-        <Col md={4}>
-          <Card className="shadow-sm">
-            <Card.Body>
-              <Card.Title>Active Polls</Card.Title>
-              <Card.Text className="display-5 fw-bold text-success">{data.activePolls.length}</Card.Text>
-              <small className="text-muted">Make sure to vote before they close</small>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={4}>
-          <Card className="shadow-sm">
-            <Card.Body>
-              <Card.Title>Visitors</Card.Title>
-              <Card.Text className="display-5 fw-bold text-warning">{data.upcomingVisitors.length}</Card.Text>
-              <small className="text-muted">Scheduled to arrive for your flat</small>
-            </Card.Body>
-          </Card>
-        </Col>
+        <StatCard
+          title="Active Polls"
+          value={data.activePolls.length}
+          subtitle="Make sure to vote before they close"
+          icon={ClipboardCheck}
+          gradient="linear-gradient(135deg, #10b981 0%, #059669 100%)"
+          delay={100}
+        />
+        <StatCard
+          title="Upcoming Visitors"
+          value={data.upcomingVisitors.length}
+          subtitle="Scheduled to arrive for your flat"
+          icon={People}
+          gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+          delay={200}
+        />
       </Row>
 
       <Row>
         <Col xl={12}>
-          <Card className="shadow-sm">
-            <Card.Body>
-              <Card.Title>Latest Notices</Card.Title>
+          <Card
+            className="modern-card"
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '16px',
+            }}
+          >
+            <Card.Body style={{ padding: '24px' }}>
+              <div className="d-flex align-items-center mb-3">
+                <Megaphone
+                  size={24}
+                  style={{
+                    color: 'var(--primary-color)',
+                    marginRight: '12px',
+                  }}
+                />
+                <h5 className="mb-0" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                  Latest Notices
+                </h5>
+              </div>
               <div className="d-flex flex-column gap-3">
                 {data.notices.slice(0, 3).map((notice) => (
-                  <div key={notice._id} className="border rounded p-3 bg-light">
-                    <h6 className="mb-1">{notice.title}</h6>
-                    <small className="text-muted">{new Date(notice.createdAt).toLocaleString()}</small>
-                    <p className="mb-0 mt-2 text-muted">{notice.content.slice(0, 100)}...</p>
+                  <div
+                    key={notice._id}
+                    className="border-modern p-3"
+                    style={{
+                      backgroundColor: 'var(--bg-secondary)',
+                      borderRadius: '12px',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'translateX(4px)';
+                      e.currentTarget.style.boxShadow = 'var(--shadow-sm)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = 'translateX(0)';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    <h6
+                      className="mb-1"
+                      style={{
+                        color: 'var(--text-primary)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {notice.title}
+                    </h6>
+                    <small style={{ color: 'var(--text-secondary)' }}>
+                      {new Date(notice.createdAt).toLocaleString()}
+                    </small>
+                    <p
+                      className="mb-0 mt-2"
+                      style={{
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.9rem',
+                      }}
+                    >
+                      {notice.content.slice(0, 100)}...
+                    </p>
                   </div>
                 ))}
               </div>
@@ -109,18 +233,76 @@ export default function Dashboard() {
 
       <Row>
         <Col md={6}>
-          <Card className="shadow-sm">
-            <Card.Body>
-              <Card.Title>Your Recent Complaints</Card.Title>
+          <Card
+            className="modern-card h-100"
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '16px',
+            }}
+          >
+            <Card.Body style={{ padding: '24px' }}>
+              <div className="d-flex align-items-center mb-3">
+                <ExclamationTriangle
+                  size={24}
+                  style={{
+                    color: 'var(--warning-color)',
+                    marginRight: '12px',
+                  }}
+                />
+                <h5 className="mb-0" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                  Your Recent Complaints
+                </h5>
+              </div>
               <div className="d-flex flex-column gap-3">
                 {data.complaints.slice(0, 3).map((complaint) => (
-                  <div key={complaint._id} className="border rounded p-3">
-                    <div className="d-flex justify-content-between align-items-center">
-                      <h6 className="mb-0">{complaint.subject}</h6>
-                      <span className="badge bg-secondary text-uppercase">{complaint.status.replaceAll('_', ' ')}</span>
+                  <div
+                    key={complaint._id}
+                    className="border-modern p-3"
+                    style={{
+                      backgroundColor: 'var(--bg-secondary)',
+                      borderRadius: '12px',
+                    }}
+                  >
+                    <div className="d-flex justify-content-between align-items-center mb-2">
+                      <h6
+                        className="mb-0"
+                        style={{
+                          color: 'var(--text-primary)',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {complaint.subject}
+                      </h6>
+                      <span
+                        className="badge"
+                        style={{
+                          backgroundColor:
+                            complaint.status === 'resolved'
+                              ? 'var(--success-color)'
+                              : complaint.status === 'rejected'
+                              ? 'var(--danger-color)'
+                              : 'var(--warning-color)',
+                          color: 'white',
+                          padding: '4px 12px',
+                          borderRadius: '6px',
+                          fontSize: '0.75rem',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {complaint.status.replace('_', ' ')}
+                      </span>
                     </div>
-                    <p className="text-muted mb-1 mt-2">{complaint.description.slice(0, 120)}...</p>
-                    <small className="text-muted">
+                    <p
+                      style={{
+                        color: 'var(--text-secondary)',
+                        fontSize: '0.9rem',
+                        marginBottom: '8px',
+                      }}
+                    >
+                      {complaint.description.slice(0, 120)}...
+                    </p>
+                    <small style={{ color: 'var(--text-muted)' }}>
                       Updated: {new Date(complaint.updatedAt || complaint.createdAt).toLocaleDateString()}
                     </small>
                   </div>
@@ -130,19 +312,56 @@ export default function Dashboard() {
           </Card>
         </Col>
         <Col md={6}>
-          <Card className="shadow-sm">
-            <Card.Body>
-              <Card.Title>Active Polls</Card.Title>
+          <Card
+            className="modern-card h-100"
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-color)',
+              borderRadius: '16px',
+            }}
+          >
+            <Card.Body style={{ padding: '24px' }}>
+              <div className="d-flex align-items-center mb-3">
+                <ClipboardCheck
+                  size={24}
+                  style={{
+                    color: 'var(--info-color)',
+                    marginRight: '12px',
+                  }}
+                />
+                <h5 className="mb-0" style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
+                  Active Polls
+                </h5>
+              </div>
               <div className="d-flex flex-column gap-3">
                 {data.activePolls.map((poll) => (
-                  <div key={poll._id} className="border rounded p-3 bg-white">
-                    <h6>{poll.question}</h6>
-                    <small className="text-muted">
+                  <div
+                    key={poll._id}
+                    className="border-modern p-3"
+                    style={{
+                      backgroundColor: 'var(--bg-secondary)',
+                      borderRadius: '12px',
+                    }}
+                  >
+                    <h6
+                      style={{
+                        color: 'var(--text-primary)',
+                        fontWeight: 600,
+                        marginBottom: '8px',
+                      }}
+                    >
+                      {poll.question}
+                    </h6>
+                    <small style={{ color: 'var(--text-secondary)' }}>
                       Closes {poll.closesAt ? new Date(poll.closesAt).toLocaleString() : 'soon'}
                     </small>
                   </div>
                 ))}
-                {!data.activePolls.length && <p className="text-muted mb-0">No active polls at the moment.</p>}
+                {!data.activePolls.length && (
+                  <p style={{ color: 'var(--text-muted)', margin: 0, textAlign: 'center', padding: '20px' }}>
+                    No active polls at the moment.
+                  </p>
+                )}
               </div>
             </Card.Body>
           </Card>
@@ -151,4 +370,3 @@ export default function Dashboard() {
     </div>
   );
 }
-

@@ -10,6 +10,7 @@ const visitorRoutes = require('./visitorRoutes');
 const paymentRoutes = require('./paymentRoutes');
 const dashboardRoutes = require('./dashboardRoutes');
 const communityRoutes = require('./communityRoutes');
+const chatbotRoutes = require('./chatbotRoutes');
 
 const router = express.Router();
 
@@ -23,6 +24,7 @@ router.use('/visitors', visitorRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/community', communityRoutes);
+router.use('/chatbot', chatbotRoutes);
 
 module.exports = router;
 

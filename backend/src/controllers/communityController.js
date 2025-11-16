@@ -6,9 +6,20 @@ const CommunityPost = require('../models/CommunityPost');
 const createPost = asyncHandler(async (req, res) => {
   const { content, images } = req.body;
   
+  // Validate and sanitize images array
+  let sanitizedImages = [];
+  if (images && Array.isArray(images)) {
+    sanitizedImages = images
+      .filter(img => img && img.url && typeof img.url === 'string' && img.url.trim() !== '')
+      .map(img => ({
+        url: img.url.trim(),
+        fileName: img.fileName || 'image.jpg',
+      }));
+  }
+  
   const post = await CommunityPost.create({
     content,
-    images: images || [],
+    images: sanitizedImages,
     createdBy: req.user._id,
     likes: [],
     comments: [],

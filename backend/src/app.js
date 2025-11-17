@@ -16,7 +16,8 @@ const app = express();
 // Add your Vercel frontend domain here
 const defaultOrigins = [
   'http://localhost:5173',
-  'https://society-beio-ed38k5x6k-priyanshi-bhanges-projects.vercel.app'
+  'https://society-beio-ed38k5x6k-priyanshi-bhanges-projects.vercel.app',
+  'https://society-4v8u.vercel.app'
 ];
 
 // Read allowed origins from .env (Render)

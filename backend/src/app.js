@@ -26,10 +26,16 @@ const allowedOrigins =
     .map((origin) => origin.trim())
     .filter(Boolean);
 
+const allowedSuffixes = (process.env.ALLOWED_ORIGIN_SUFFIXES || '')
+  .split(',')
+  .map((suffix) => suffix.trim())
+  .filter(Boolean);
+
 // Merge .env origins + defaults
 const originWhitelist = [...new Set([...defaultOrigins, ...allowedOrigins])];
 
-console.log("CORS Allowed Origins:", originWhitelist);
+console.log('CORS Allowed Origins:', originWhitelist);
+console.log('CORS Allowed Suffixes:', allowedSuffixes);
 
 app.use(
   cors({
@@ -39,7 +45,15 @@ app.use(
         return callback(null, true);
       }
 
-      console.error("❌ CORS BLOCKED:", origin);
+      const matchesSuffix = allowedSuffixes.some((suffix) =>
+        origin.endsWith(suffix),
+      );
+
+      if (matchesSuffix) {
+        return callback(null, true);
+      }
+
+      console.error('❌ CORS BLOCKED:', origin);
       return callback(new Error('Not allowed by CORS'));
     },
     credentials: true,
